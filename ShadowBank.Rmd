@@ -314,8 +314,8 @@ $$
 ```{r warning=TRUE}
 # "LNSB"   "DLNM2"  "GYZS"   "CPI"    "SHIBOR"
 colnames(raw_data)
-var.raw_data = VAR(as.matrix(raw_data), p=1, type=c("both"), ic = c("AIC", "HQ", "SC", "FPE"))
-print(var.raw_data)
+var_raw_data = VAR(as.matrix(raw_data), p=1, type=c("both"), ic = c("AIC", "HQ", "SC", "FPE"))
+print(var_raw_data)
 
 # column major to create matrix.
 A = matrix(
@@ -329,17 +329,17 @@ c(1, 0, 0, 0, 0,
  ncol = 5)
 
 B = diag(5)
-svar.raw_data = SVAR(var.raw_data, Amat = A, Bmat = B, estmethod="direct")
-print(svar.raw_data)
+svar_raw_data = SVAR(var_raw_data, Amat = A, Bmat = B, estmethod="direct")
+print(svar_raw_data)
 ```
 
 下面对模型做预测误差的方差分解。
 ```{r}
-vd.raw_data = fevd(var.raw_data, n.ahead = 5)
-print(vd.raw_data)
+vd_raw_data = fevd(svar_raw_data, n.ahead = 5)
+summary(vd_raw_data)
 ```
 计算脉冲响应。
 ```{r}
-irf.raw_data = irf(svar.raw_data, n.ahead = 5)
-print(irf.raw_data)
+irf_raw_data = irf(svar_raw_data, n.ahead = 5)
+summary(irf_raw_data)
 ```
