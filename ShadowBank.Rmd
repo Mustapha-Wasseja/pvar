@@ -2,7 +2,7 @@
 title: "Chinese shadow bank model"
 output: html_document
 ---
-<!--
+
 本程序描述在R中对影子银行建模，并对模型进行分析和研究。
 
 首先加载需要用到的R包。R包是一些工具的集合，方便重复使用。
@@ -223,17 +223,17 @@ diff_lnsb.df
 #summary(ur.df(as.vector(raw_data[, "SHIBOR"]), type="trend", lags=2))
 ```
 
--->
+
 ![Model description.](model.png)
 
 下面我们来建立影子银行的SVAR模型。
 $$
 \begin{aligned}
-GYZS_t &=& c_1 + \alpha_1 GYZS_{t - 1} + \alpha_2\left( shibor_t - cpi_t \right ) + \mu_{1t} \\
-\Delta\ln m2_t &=& c_2 + \beta_1 \Delta \ln m2_{t - 1} + \beta_2 GYZS_t + \beta_3 \left ( shibor_i - cpi_t \right ) + \mu_{2t} \\
+\ln sb_t &=& c_5 + \lambda_1 \ln sb_{t - 1} + \lambda_2 GYZS_t + \lambda_3 shibor_t + \mu_{5t} \\
+\Delta\ln m2_t &=& c_2 + \beta_1 \Delta \ln m2_{t - 1} + \beta_2 GYZS_t + \beta_3 shibor_i - \beta_4 cpi_t + \mu_{2t} \\
+GYZS_t &=& c_1 + \alpha_1 GYZS_{t - 1} + \alpha_2 shibor_t - \alpha_3 cpi_t + \mu_{1t} \\
 cpi_t &=& c_3 + \phi_1 cpi_{t - 1} + \phi_2 GYZS_t + \mu_{3t} \\
 shibor_t &=& c_4 + \gamma_1 shibor_{t - 1} + \gamma_2 GYZS_t + \gamma_3 cpi_t + \mu_{4t} \\
-\ln sb_t &=& c_5 + \lambda_1 \ln sb_{t - 1} + \lambda_2 GYZS_t + \lambda_3 shibor_t + \mu_{5t} \\
 \end{aligned}
 $$
 如果用矩阵形式来表达的话。
@@ -241,51 +241,51 @@ $$
 \left [
 \begin{array}
 {rrrrr}
-1 & 0 & \alpha_2 & -\alpha_2 & 0 \\
--\beta_2 & 1 & \beta_3 & -\beta_3 & 0 \\
--\phi_2 & 0 & 1 & 0 & 0 \\
--\gamma_2 & 0 & 0 & 1 & 0 \\
--\lambda_2 & 0 & 0 & -\lambda_3 & 1
+  1  &       0    &   -\lambda_2    &      0        &     -\lambda_3   \\
+  0  &       1    &   -\beta_2      &   \beta_4     &      -\beta_3    \\
+  0  &       0    &   1             & \alpha_3      & -\alpha_2        \\
+  0  &       0    &   -\phi_2       &      1        &        0         \\
+  0  &       0    &   -\gamma_2     &      0        &        1         
 \end{array}
 \right]
 \left[
 \begin{array}
 {r}
-GYZS_t \\
+\ln sb_t  \\
 \Delta\ln m2_t \\
+GYZS_t \\
 cpi_t \\
-shibor_t \\
-\ln sb_t 
+shibor_t
 \end{array}
 \right] =
 \left[
 \begin{array}
 {rrrrr}
-\alpha_1 & 0 & 0 & 0 & 0 \\
-0 & \beta_1 & 0 & 0 & 0 \\
-0 & 0 & \phi_1 & 0 & 0 \\
-0 & 0 & 0 & \gamma_1 & 0 \\
-0 & 0 & 0 & 0 & \lambda_1
+  \lambda_1    &        0           &    0          &        0     &      0      \\
+  0            &        \beta_1     &    0          &        0     &      0      \\
+  0            &        0           &    \alpha_1   &        0     &      0      \\
+  0            &        0           &    0          &     \phi_1   &      0      \\
+  0            &        0           &    0          &        0     &  \gamma_1    
 \end{array}
 \right]
 \left[
 \begin{array}
 {r}
-GYZS_{t - 1} \\
+\ln sb_{t-1} \\
 \Delta\ln m2_{t-1} \\
+GYZS_{t - 1} \\
 cpi_{t-1} \\
-shibor_{t-1} \\
-\ln sb_{t-1} 
+shibor_{t-1}
 \end{array}
 \right] +
 \left[
 \begin{array}
 {r}
-c_1 \\
+c_5 \\
 c_2 \\
+c_1 \\
 c_3 \\
-c_4 \\
-c_5
+c_4
 \end{array}
 \right] +
 \left[
@@ -309,3 +309,37 @@ c_5
 \end{array}
 \right]
 $$
+
+下面我们来估计SVAR模型中的参数。
+```{r warning=TRUE}
+# "LNSB"   "DLNM2"  "GYZS"   "CPI"    "SHIBOR"
+colnames(raw_data)
+var.raw_data = VAR(as.matrix(raw_data), p=1, type=c("both"), ic = c("AIC", "HQ", "SC", "FPE"))
+print(var.raw_data)
+
+# column major to create matrix.
+A = matrix(
+c(1, 0, 0, 0, 0,
+  0, 1, 0, 0, 0,
+  NA, NA, 1, NA, NA,
+  0, NA, NA, 1, 0,
+  NA, NA, NA, 0, 1
+),
+ nrow = 5,
+ ncol = 5)
+
+B = diag(5)
+svar.raw_data = SVAR(var.raw_data, Amat = A, Bmat = B, estmethod="direct")
+print(svar.raw_data)
+```
+
+下面对模型做预测误差的方差分解。
+```{r}
+vd.raw_data = fevd(var.raw_data, n.ahead = 5)
+print(vd.raw_data)
+```
+计算脉冲响应。
+```{r}
+irf.raw_data = irf(svar.raw_data, n.ahead = 5)
+print(irf.raw_data)
+```
